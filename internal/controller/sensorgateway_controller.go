@@ -64,7 +64,7 @@ func (r *SensorGatewayReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 	err := r.Get(ctx, types.NamespacedName{Name: sensorGateway.Name, Namespace: sensorGateway.Namespace}, found)
 	if err != nil && k8serrors.IsNotFound(err) {
 		// Define a new deployment
-		dep := r.deploymentForGateway(sensorGateway)
+		dep := r.deploymentForGateway(ctx, sensorGateway)
 		log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
 		if err := r.Create(ctx, dep); err != nil {
 			log.Error(err, "Failed to create Deployment")
@@ -76,13 +76,14 @@ func (r *SensorGatewayReconciler) Reconcile(ctx context.Context, req ctrl.Reques
 		log.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
 	}
+	// TODO : Update the deployment if necessary
 	// Deployment already exists - don't requeue
 	log.Info("Skip reconcile: Deployment already exists", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
 	return ctrl.Result{}, nil
 }
 
 // deploymentForGateway returns a SensorGateway Deployment object
-func (r *SensorGatewayReconciler) deploymentForGateway(gw *iotv1alpha1.SensorGateway) *appsv1.Deployment {
+func (r *SensorGatewayReconciler) deploymentForGateway(ctx context.Context, gw *iotv1alpha1.SensorGateway) *appsv1.Deployment {
 	labels := map[string]string{
 		"app":           "sensor-gateway",
 		"controller_cr": gw.Name,
@@ -127,7 +128,11 @@ func (r *SensorGatewayReconciler) deploymentForGateway(gw *iotv1alpha1.SensorGat
 			},
 		},
 	}
-	ctrl.SetControllerReference(gw, dep, r.Scheme)
+	err := ctrl.SetControllerReference(gw, dep, r.Scheme)
+	if err != nil {
+		log.FromContext(ctx).Error(err, "Failed to set controller reference")
+		return nil
+	}
 	return dep
 }
 
