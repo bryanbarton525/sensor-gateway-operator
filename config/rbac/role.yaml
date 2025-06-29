@@ -5,9 +5,9 @@ metadata:
   name: manager-role
 rules:
 - apiGroups:
-  - iot.iambarton.com
+  - apps
   resources:
-  - sensorgateways
+  - deployments
   verbs:
   - create
   - delete
@@ -19,9 +19,15 @@ rules:
 - apiGroups:
   - iot.iambarton.com
   resources:
-  - sensorgateways/finalizers
+  - sensorgateways
   verbs:
+  - create
+  - delete
+  - get
+  - list
+  - patch
   - update
+  - watch
 - apiGroups:
   - iot.iambarton.com
   resources:
