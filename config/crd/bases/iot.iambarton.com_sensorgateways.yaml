@@ -45,6 +45,8 @@ spec:
                 type: string
               image:
                 type: string
+              sensorType:
+                type: string
               topic:
                 type: string
             type: object

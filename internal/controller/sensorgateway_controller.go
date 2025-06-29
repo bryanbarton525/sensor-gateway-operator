@@ -122,6 +122,10 @@ func (r *SensorGatewayReconciler) deploymentForGateway(ctx context.Context, gw *
 								Name:  "MQTT_TOPIC",
 								Value: gw.Spec.Topic,
 							},
+							{
+								Name:  "SENSOR_TYPE",
+								Value: gw.Spec.SensorType,
+							},
 						},
 					}},
 				},

@@ -29,6 +29,7 @@ type SensorGatewaySpec struct {
 	BrokerURL  string `json:"brokerURL,omitempty"`
 	BrokerPort string `json:"brokerPort,omitempty"`
 	Topic      string `json:"topic,omitempty"`
+	SensorType string `json:"sensorType,omitempty"`
 }
 
 // SensorGatewayStatus defines the observed state of SensorGateway.
