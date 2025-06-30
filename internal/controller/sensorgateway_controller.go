@@ -18,6 +18,7 @@ package controller
 
 import (
 	"context"
+	"reflect"
 
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
@@ -43,48 +44,72 @@ type SensorGatewayReconciler struct {
 //+kubebuilder:rbac:groups=iot.iambarton.com,resources=sensorgateways/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 
-
 func (r *SensorGatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
-	log := log.FromContext(ctx)
-	log.Info("Reconciling SensorGateway", "name", req.Name, "namespace", req.Namespace)
+	logger := log.FromContext(ctx)
+	logger.Info("Reconciliation loop started")
 
-	// Fetch the SensorGateway instance
-	sensorGateway := &iotv1alpha1.SensorGateway{}
-	if err := r.Get(ctx, req.NamespacedName, sensorGateway); err != nil {
+	// 1. Fetch the SensorGateway resource
+	gateway := &iotv1alpha1.SensorGateway{}
+	if err := r.Get(ctx, req.NamespacedName, gateway); err != nil {
 		if k8serrors.IsNotFound(err) {
-			// Request object not found, could have been deleted after reconcile request.
-			log.Info("SensorGateway resource not found, ignoring since object must be deleted")
+			logger.Info("SensorGateway resource not found. Ignoring since object must be deleted.")
 			return ctrl.Result{}, nil
 		}
-		// Error reading the object - requeue the request.
-		log.Error(err, "Failed to get SensorGateway")
+		logger.Error(err, "Failed to get SensorGateway")
 		return ctrl.Result{}, err
 	}
-	// Check if the deployment already exists, if not create a new one
-	found := &iotv1alpha1.SensorGateway{}
-	err := r.Get(ctx, types.NamespacedName{Name: sensorGateway.Name, Namespace: sensorGateway.Namespace}, found)
+
+	// 2. Check if the Deployment already exists
+	foundDeployment := &appsv1.Deployment{}
+	err := r.Get(ctx, types.NamespacedName{Name: gateway.Name, Namespace: gateway.Namespace}, foundDeployment)
+
+	// 3. Deployment does not exist - CREATE IT
 	if err != nil && k8serrors.IsNotFound(err) {
-		// Define a new deployment
-		dep := r.deploymentForGateway(ctx, sensorGateway)
-		log.Info("Creating a new Deployment", "Deployment.Namespace", dep.Namespace, "Deployment.Name", dep.Name)
-		if err := r.Create(ctx, dep); err != nil {
-			log.Error(err, "Failed to create Deployment")
+		logger.Info("Deployment not found. Creating a new one.")
+		desiredDeployment, err := r.deploymentForGateway(ctx, gateway)
+		if err != nil {
+			logger.Error(err, "Failed to create desired Deployment")
 			return ctrl.Result{}, err
 		}
-		// Deployment created successfully - return and requeue
+		if err := r.Create(ctx, desiredDeployment); err != nil {
+			logger.Error(err, "Failed to create new Deployment", "Deployment.Namespace", desiredDeployment.Namespace, "Deployment.Name", desiredDeployment.Name)
+			return ctrl.Result{}, err
+		}
+		logger.Info("Successfully created new Deployment.")
+		// Requeue to check status after creation
 		return ctrl.Result{Requeue: true}, nil
 	} else if err != nil {
-		log.Error(err, "Failed to get Deployment")
+		// Some other error occurred when trying to fetch the deployment
+		logger.Error(err, "Failed to get Deployment")
 		return ctrl.Result{}, err
 	}
-	// TODO : Update the deployment if necessary
-	// Deployment already exists - don't requeue
-	log.Info("Skip reconcile: Deployment already exists", "Deployment.Namespace", found.Namespace, "Deployment.Name", found.Name)
+
+	// 4. Deployment EXISTS - UPDATE IT if necessary
+	logger.Info("Deployment found. Checking for drift.")
+	desiredDeployment, err := r.deploymentForGateway(ctx, gateway)
+	if err != nil {
+		logger.Error(err, "Failed to create desired Deployment")
+		return ctrl.Result{}, err
+	}
+
+	// Compare the pod template spec of the found vs desired deployment
+	if !reflect.DeepEqual(foundDeployment.Spec.Template.Spec, desiredDeployment.Spec.Template.Spec) {
+		logger.Info("Drift detected. Updating Deployment spec.")
+		foundDeployment.Spec.Template.Spec = desiredDeployment.Spec.Template.Spec
+		if err := r.Update(ctx, foundDeployment); err != nil {
+			logger.Error(err, "Failed to update Deployment", "Deployment.Namespace", foundDeployment.Namespace, "Deployment.Name", foundDeployment.Name)
+			return ctrl.Result{}, err
+		}
+		logger.Info("Successfully updated Deployment.")
+		return ctrl.Result{Requeue: true}, nil
+	}
+
+	logger.Info("Reconciliation finished. No changes required.")
 	return ctrl.Result{}, nil
 }
 
 // deploymentForGateway returns a SensorGateway Deployment object
-func (r *SensorGatewayReconciler) deploymentForGateway(ctx context.Context, gw *iotv1alpha1.SensorGateway) *appsv1.Deployment {
+func (r *SensorGatewayReconciler) deploymentForGateway(ctx context.Context, gw *iotv1alpha1.SensorGateway) (*appsv1.Deployment, error) {
 	labels := map[string]string{
 		"app":           "sensor-gateway",
 		"controller_cr": gw.Name,
@@ -136,9 +161,9 @@ func (r *SensorGatewayReconciler) deploymentForGateway(ctx context.Context, gw *
 	err := ctrl.SetControllerReference(gw, dep, r.Scheme)
 	if err != nil {
 		log.FromContext(ctx).Error(err, "Failed to set controller reference")
-		return nil
+		return nil, err
 	}
-	return dep
+	return dep, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
