@@ -40,9 +40,9 @@ type SensorGatewayReconciler struct {
 	Scheme *runtime.Scheme
 }
 
-//+kubebuilder:rbac:groups=iot.iambarton.com,resources=sensorgateways,verbs=get;list;watch;create;update;patch;delete
-//+kubebuilder:rbac:groups=iot.iambarton.com,resources=sensorgateways/status,verbs=get;update;patch
-//+kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=iot.iambarton.com,resources=sensorgateways,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=iot.iambarton.com,resources=sensorgateways/status,verbs=get;update;patch
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
 
 func (r *SensorGatewayReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	logger := log.FromContext(ctx)
