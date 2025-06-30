@@ -38,7 +38,7 @@ var _ = Describe("SensorGateway Controller", func() {
 
 		typeNamespacedName := types.NamespacedName{
 			Name:      resourceName,
-			Namespace: "default", // TODO(user):Modify as needed
+			Namespace: "default",
 		}
 		sensorgateway := &iotv1alpha1.SensorGateway{}
 
@@ -51,7 +51,13 @@ var _ = Describe("SensorGateway Controller", func() {
 						Name:      resourceName,
 						Namespace: "default",
 					},
-					// TODO(user): Specify other spec details if needed.
+					Spec: iotv1alpha1.SensorGatewaySpec{
+						Image:      "sensor-gateway-image:latest",
+						BrokerURL:  "mqtt://broker.example.com",
+						BrokerPort: "1883",
+						Topic:      "sensor/data",
+						SensorType: "dht11",
+					},
 				}
 				Expect(k8sClient.Create(ctx, resource)).To(Succeed())
 			}
